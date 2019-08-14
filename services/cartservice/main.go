@@ -58,7 +58,7 @@ func addToCart(c *gin.Context) {
 	c.JSON(
 		http.StatusCreated,
 		gin.H{
-			"status": "added items to cart",
+			"status": "ok",
 		},
 	)
 }
@@ -79,7 +79,7 @@ func getCart(c *gin.Context) {
 		return
 	}
 
-	// Convert to our Cart struct and marshal to JSON
+	// Convert to our Cart struct
 	var items []Item
 	for k, v := range result {
 		qty, _ := strconv.Atoi(v)
@@ -115,7 +115,7 @@ func emptyCart(c *gin.Context) {
 	// Return cart emptied message
 	c.JSON(
 		http.StatusOK,
-		gin.H{"message": "cart emptied"},
+		gin.H{"message": "ok"},
 	)
 }
 
@@ -139,14 +139,33 @@ func init() {
 		DB:       0,  // use default DB
 	})
 
+	log.Println("Starting service userservice...")
+	log.Printf("Connecting to Redis on host '%v'...", redisHost)
 	err := rclient.Ping().Err()
 	if err != nil {
-		log.Panicln("Could not connect to Redis on host", redisHost)
+		// Retry a couple times
+		counter := 3
+		for counter > 0 {
+			err := rclient.Ping().Err()
+			if err != nil {
+				log.Printf("Could not connect to Redis on host '%v', trying %v more time(s)", redisHost, counter)
+				counter--
+
+				if counter == 0 {
+					log.Panicf("Could not connect to Redis on host '%v'.", redisHost)
+					break
+				}
+				continue
+			}
+			break
+		}
 	}
+	log.Printf("Successfully connected to Redis on host '%v'...", redisHost)
 }
 
 func main() {
 	// Start HTTP server
+	gin.SetMode(gin.ReleaseMode)
 	r := setupRouter()
 	log.Println("Server started. Now accepting connections...")
 	r.Run(":8080")
