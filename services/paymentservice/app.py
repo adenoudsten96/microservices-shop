@@ -1,13 +1,14 @@
 from flask import Flask, render_template, request, jsonify
 import time
 import random
+import uuid
 app = Flask(__name__)
 
 class Payment:
 
 	def __init__(self, creditcard, paymentid):
 		self.creditcard = creditcard
-		self.paymentid = id
+		self.paymentid = paymentid
 
 payments = []
 
@@ -20,17 +21,18 @@ def index():
 	time.sleep(1)
 
 	# Save the payment
-	np = Payment(creditcard=data["creditcard"], paymentid=random.randint(1, 100000))
+	id = uuid.uuid4()
+	np = Payment(creditcard=data["creditcard"], paymentid=id)
 	payments.append(np)
 
 	# Make JSON response
 	payload = {
-		"status": "success"
+		"transactionid": str(np.paymentid)
 	}
 	payload = jsonify(payload)
 
 	# Return payment
-	return payload, 201
+	return payload, 200
 
 
 if __name__ == '__main__':

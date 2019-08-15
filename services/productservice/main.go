@@ -146,5 +146,5 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	r := setupRouter()
 	log.Println("Server started. Now accepting connections...")
-	r.Run(":8080")
+	r.Run(":8082")
 }
