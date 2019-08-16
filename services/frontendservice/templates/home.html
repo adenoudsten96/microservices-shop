@@ -1,0 +1,48 @@
+{{ template "header"}}
+    <main role="main">
+        <section class="jumbotron text-center mb-0">
+            <div class="container">
+                <h1 class="jumbotron-heading">
+                    One-stop shop for all your electronic devices.
+                </h1>
+                <p class="lead text-muted">
+                    Microservices shop only sells the best stuff.
+                </p>
+            </div>
+        </section>
+
+        <div class="py-5 bg-light">
+            <div class="container">
+            <div class="row">
+                {{ range . }}
+                <div class="col-md-4">
+                    <div class="card mb-4 box-shadow">
+                        <a href="/product/{{.SKU}}">
+                            <img class="card-img-top" alt =""
+                                style="width: 100%; height: auto;"
+                                src="/static/{{.SKU}}.jpg">
+                        </a>
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                {{ .Name }}
+                            </h5>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="btn-group">
+                                    <a href="/product/{{.SKU}}">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary">Buy</button>
+                                    </a>
+                                </div>
+                                <small class="text-muted">
+                                    €{{ .Price }},-
+                                </strong>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {{ end }}
+            </div>
+            </div>
+        </div>
+    </main>
+{{ template "footer" }}
