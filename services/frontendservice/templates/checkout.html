@@ -1,0 +1,27 @@
+    {{ template "header" }}
+
+    <main role="main">
+        <div class="py-5">
+            <div class="container bg-light py-3 px-lg-5">
+                <div class="row mt-5 py-2">
+                    <div class="col">
+                    <h3>
+                        Your order is complete!
+                    </h3>
+                    <p>
+                        Transaction ID: <strong>{{ .response.TransactionID }}</strong>
+                        <br>
+                        Shipping Tracking ID: <strong>{{ .response.ShippingID }}</strong>
+                    </p>
+                    <p>
+                        <br>
+                        Total Paid: <strong>€{{ .total }}</strong>
+                    </p>
+                    <a class="btn btn-primary" href="/" role="button">Browse other products &rarr; </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    {{ template "footer" }}

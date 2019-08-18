@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"html/template"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -15,15 +14,17 @@ import (
 
 	"github.com/gorilla/mux"
 	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
 	tpl             *template.Template
-	cartservice     = os.Getenv("CARTSERVICE")
-	emailservice    = os.Getenv("EMAILSERVICE")
-	paymentservice  = os.Getenv("PAYMENTSERVICE")
-	shippingservice = os.Getenv("SHIPPINGSERVICE")
-	productservice  = os.Getenv("PRODUCTSERVICE")
+	cartservice     = mustMapEnv("CARTSERVICE")
+	emailservice    = mustMapEnv("EMAILSERVICE")
+	paymentservice  = mustMapEnv("PAYMENTSERVICE")
+	shippingservice = mustMapEnv("SHIPPINGSERVICE")
+	productservice  = mustMapEnv("PRODUCTSERVICE")
+	checkoutservice = mustMapEnv("CHECKOUTSERVICE")
 )
 
 // ProductResponse is the response that comes back from the productservice
@@ -47,28 +48,64 @@ type Item struct {
 
 func init() {
 	tpl = template.Must(template.ParseGlob("templates/*"))
+	log.SetFormatter(&log.JSONFormatter{})
+	log.SetOutput(os.Stdout)
 }
 
-func cartDelete(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie("sessionid")
-	if err != nil {
-		log.Println(err)
-		renderError(w, r, 0, err)
-		return
-	}
-	sessionid := cookie.Value
+func homePage(w http.ResponseWriter, r *http.Request) {
 
-	status, err := deleteCart(sessionid)
+	// Set the sessionID in a cookie if there isn't already one set
+	_, err := r.Cookie("sessionid")
 	if err != nil {
-		log.Println(err)
+		uuid, err := uuid.NewV4()
+		if err != nil {
+			log.Println(err)
+		}
+		cookie := http.Cookie{Name: "sessionid", Value: uuid.String(), Expires: time.Now().Add(1 * time.Hour)}
+		http.SetCookie(w, &cookie)
+	}
+
+	// Get all products
+	products, status, err := getProducts()
+	// Render error page if something went wrong
+	if status != 200 {
 		renderError(w, r, status, err)
 		return
 	}
 
-	http.Redirect(w, r, "/", 301)
+	err = tpl.ExecuteTemplate(w, "home.html", products)
+	if err != nil {
+		log.Println(err)
+	}
 }
 
-func cart(w http.ResponseWriter, r *http.Request) {
+func productPage(w http.ResponseWriter, r *http.Request) {
+
+	products, status, err := getProducts()
+
+	// Render error page if something went wrong
+	if status != 200 {
+		renderError(w, r, status, err)
+		return
+	}
+
+	vars := mux.Vars(r)
+	sku := vars["SKU"]
+
+	for _, v := range products {
+		if v.SKU == sku {
+			err := tpl.ExecuteTemplate(w, "product.html", v)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			return
+		}
+	}
+
+}
+
+func cartPage(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "POST" {
 
@@ -119,7 +156,14 @@ func cart(w http.ResponseWriter, r *http.Request) {
 
 	var irs []ItemRow
 	var total int
-	products := getProducts()
+
+	products, status, err := getProducts()
+	// Render error page if something went wrong
+	if status != 200 {
+		renderError(w, r, status, err)
+		return
+	}
+
 	for _, v := range cart.Items {
 		var ir ItemRow
 		for _, c := range products {
@@ -143,52 +187,29 @@ func cart(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func product(w http.ResponseWriter, r *http.Request) {
+func checkoutPage(w http.ResponseWriter, r *http.Request) {
+	// Get form values and sessionID
+	r.ParseForm()
+	address := r.PostFormValue("street_address")
+	creditcard := r.PostFormValue("credit_card_number")
+	email := r.PostFormValue("email")
+	total := r.PostFormValue("total")
+	cookie, _ := r.Cookie("sessionid")
+	sessionid := cookie.Value
 
-	products := getProducts()
-
-	vars := mux.Vars(r)
-	sku := vars["SKU"]
-
-	for _, v := range products {
-		if v.SKU == sku {
-			err := tpl.ExecuteTemplate(w, "product.html", v)
-			if err != nil {
-				fmt.Println(err)
-			}
-		}
+	// Prepare JSON payload
+	payload := map[string]interface{}{
+		"SessionID":  sessionid,
+		"Address":    address,
+		"Email":      email,
+		"Creditcard": creditcard,
 	}
+	jsonPayload, _ := json.Marshal(payload)
 
-}
-
-func homepage(w http.ResponseWriter, r *http.Request) {
-
-	// Set the sessionID in a cookie if there isn't already one set
-	_, err := r.Cookie("sessionid")
-	if err != nil {
-		uuid, err := uuid.NewV4()
-		if err != nil {
-			log.Println(err)
-		}
-		cookie := http.Cookie{Name: "sessionid", Value: uuid.String(), Expires: time.Now().Add(1 * time.Hour)}
-		http.SetCookie(w, &cookie)
-	}
-
-	// Get all products and display them
-	products := getProducts()
-	err = tpl.ExecuteTemplate(w, "home.html", products)
-	if err != nil {
-		log.Println(err)
-	}
-}
-
-func getProducts() []ProductResponse {
-
-	// Get all products
-	url := fmt.Sprintf("%v/product", productservice)
-
-	log.Println("Calling service productservice...")
-	resp, err := http.Get(url)
+	// Check the user out by calling the checkoutservice
+	url := fmt.Sprintf("%v/checkout", checkoutservice)
+	log.Println("Calling service checkoutservice...")
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		log.Println(err)
 	}
@@ -200,10 +221,88 @@ func getProducts() []ProductResponse {
 		log.Println(err)
 	}
 
-	var products []ProductResponse
-	json.Unmarshal(result, &products)
+	// Unmarshal response
+	type CheckoutResponse struct {
+		TransactionID string
+		ShippingID    string
+	}
+	var cr CheckoutResponse
+	json.Unmarshal(result, &cr)
 
-	return products
+	// Render error page if something went wrong
+	if resp.StatusCode != 200 {
+		renderError(w, r, resp.StatusCode, errors.New(string(result)))
+		return
+	}
+
+	// Empty the shopping cart and render the page if the checkout was succesful
+	status, err := deleteCart(sessionid)
+	if err != nil {
+		renderError(w, r, status, err)
+		return
+	}
+
+	err = tpl.ExecuteTemplate(w, "checkout.html", map[string]interface{}{
+		"response": cr,
+		"total":    total,
+	})
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func emptyCart(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("sessionid")
+	if err != nil {
+		log.Println(err)
+		renderError(w, r, 0, err)
+		return
+	}
+	sessionid := cookie.Value
+
+	status, err := deleteCart(sessionid)
+	if err != nil {
+		log.Println(err)
+		renderError(w, r, status, err)
+		return
+	}
+
+	http.Redirect(w, r, "/", 301)
+}
+
+func getProducts() ([]ProductResponse, int, error) {
+
+	// Get all products
+	url := fmt.Sprintf("%v/product", productservice)
+
+	log.Println("Calling service productservice...")
+	resp, err := http.Get(url)
+	if err != nil {
+		log.Println(err)
+		return []ProductResponse{}, 0, err
+	}
+	defer resp.Body.Close()
+
+	// Read HTTP body
+	result, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Println(err)
+		return []ProductResponse{}, 0, err
+	}
+
+	if resp.StatusCode != 200 {
+		return []ProductResponse{}, resp.StatusCode, errors.New(string(result))
+	}
+
+	var products []ProductResponse
+	err = json.Unmarshal(result, &products)
+
+	if err != nil {
+		log.Println(err)
+		return []ProductResponse{}, 0, err
+	}
+
+	return products, 200, nil
 }
 
 func addToCart(sessionid, sku string, qty int) (int, error) {
@@ -217,6 +316,7 @@ func addToCart(sessionid, sku string, qty int) (int, error) {
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonValue))
 	if err != nil {
 		log.Println(err)
+		return 0, err
 	}
 	defer resp.Body.Close()
 
@@ -224,6 +324,7 @@ func addToCart(sessionid, sku string, qty int) (int, error) {
 	result, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Println(err)
+		return 0, err
 	}
 
 	if resp.StatusCode != 201 {
@@ -240,6 +341,7 @@ func getCart(sessionid string) (Cart, int, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		log.Println(err)
+		return Cart{}, 0, err
 	}
 	defer resp.Body.Close()
 
@@ -247,6 +349,7 @@ func getCart(sessionid string) (Cart, int, error) {
 	result, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Println(err)
+		return Cart{}, 0, err
 	}
 
 	if resp.StatusCode != 200 {
@@ -300,15 +403,29 @@ func renderError(w http.ResponseWriter, r *http.Request, code int, err error) {
 		"status_code": code})
 }
 
+func mustMapEnv(envKey string) string {
+	if os.Getenv(envKey) == "" {
+		log.Panicf("Environment variable %v not set", envKey)
+	}
+	return os.Getenv(envKey)
+}
+
+func healthCheck(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(200)
+	w.Write([]byte("ok"))
+}
+
 func main() {
-	fmt.Println("Hello world!")
 
 	r := mux.NewRouter()
-	r.HandleFunc("/", homepage)
-	r.HandleFunc("/product/{SKU}", product)
-	r.HandleFunc("/cart", cart)
-	r.HandleFunc("/cart/empty", cartDelete)
+	r.HandleFunc("/", homePage).Methods(http.MethodGet)
+	r.HandleFunc("/product/{SKU}", productPage).Methods(http.MethodGet)
+	r.HandleFunc("/cart", cartPage).Methods(http.MethodGet, http.MethodPost)
+	r.HandleFunc("/cart/empty", emptyCart).Methods(http.MethodGet)
+	r.HandleFunc("/checkout", checkoutPage).Methods(http.MethodGet, http.MethodPost)
+	r.HandleFunc("/healthcheck", checkoutPage).Methods(http.MethodGet)
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	log.Info("Starting service frontend")
 
 	// Run server
 	http.ListenAndServe(":80", r)

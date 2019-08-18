@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis"
@@ -121,11 +123,34 @@ func emptyCart(c *gin.Context) {
 
 // setupRouter initializes our HTTP routes
 func setupRouter() *gin.Engine {
-	router := gin.Default()
+	router := gin.New()
+
+	router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
+
+		// Custom log format
+		return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\"\n",
+			param.ClientIP,
+			param.TimeStamp.Format(time.RFC1123),
+			param.Method,
+			param.Path,
+			param.Request.Proto,
+			param.StatusCode,
+			param.Latency,
+			param.Request.UserAgent(),
+			param.ErrorMessage,
+		)
+	}))
+	router.Use(gin.Recovery())
+
 	router.GET("/cart/:sessionid", getCart)
 	router.POST("/cart/:sessionid", addToCart)
 	router.DELETE("/cart/:sessionid", emptyCart)
+	router.GET("/health", healthCheck)
 	return router
+}
+
+func healthCheck(c *gin.Context) {
+	c.String(200, "OK")
 }
 
 var rclient *redis.Client
@@ -166,6 +191,7 @@ func init() {
 func main() {
 	// Start HTTP server
 	gin.SetMode(gin.ReleaseMode)
+	gin.DisableConsoleColor()
 	r := setupRouter()
 	log.Println("Server started. Now accepting connections...")
 	r.Run(":8081")
