@@ -1,0 +1,83 @@
+version: '3'
+
+services:
+
+  frontendservice:
+    build: services/frontendservice/
+    ports: 
+      - 80:80
+    hostname: frontendservice
+    environment: 
+      - CARTSERVICE=http://cartservice:8081
+      - EMAILSERVICE=http://emailservice:8002
+      - PAYMENTSERVICE=http://paymentservice:8000
+      - SHIPPINGSERVICE=http://shippingservice:8001
+      - PRODUCTSERVICE=http://productservice:8082
+      - CHECKOUTSERVICE=http://checkoutservice:8080
+
+  cartservice:
+    build: services/cartservice/
+    ports: 
+      - 8081:8081
+    hostname: cartservice
+    depends_on: 
+      - redis
+    environment: 
+      - REDIS_HOST=redis:6379
+
+  checkoutservice:
+    build: services/checkoutservice/
+    ports: 
+      - 8080:8080
+    hostname: checkoutservice
+    environment: 
+      - CARTSERVICE=http://cartservice:8081
+      - EMAILSERVICE=http://emailservice:8002
+      - PAYMENTSERVICE=http://paymentservice:8000
+      - SHIPPINGSERVICE=http://shippingservice:8001
+      - PRODUCTSERVICE=http://productservice:8082
+  
+  productservice:
+    build: services/productservice/
+    ports: 
+      - 8082:8082
+    hostname: productservice
+    environment: 
+      - DB_HOST=postgres
+      - DB_PASS=""
+    depends_on: 
+      - postgres
+  
+  emailservice:
+    build: services/emailservice/
+    ports: 
+      - 8002:8002
+    hostname: emailservice
+    environment: 
+      - PORT=8002
+  
+  paymentservice:
+    build: services/paymentservice/
+    ports: 
+      - 8000:8000
+    hostname: paymentservice
+    environment: 
+      - PORT=8000
+
+  shippingservice:
+    build: services/shippingservice/
+    ports: 
+      - 8001:8001
+    hostname: shippingservice
+    environment: 
+      - PORT=8001
+
+  redis:
+    image: redis
+    hostname: redis
+
+  postgres:
+    image: postgres
+    hostname: postgres
+    environment: 
+      - POSTGRES_DB=products

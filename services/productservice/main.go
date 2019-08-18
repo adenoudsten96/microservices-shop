@@ -97,9 +97,9 @@ func init() {
 	// Setup the database connection
 	var err error
 	username := "postgres"
-	password := os.Getenv("DB_PASS")
+	password := mustMapEnv("DB_PASS")
 	dbName := "products"
-	dbHost := os.Getenv("DB_HOST")
+	dbHost := mustMapEnv("DB_HOST")
 	dbURI := fmt.Sprintf("host=%s user=%s dbname=%s sslmode=disable password=%s", dbHost, username, dbName, password)
 
 	log.Println("Starting service productservice...")
@@ -162,6 +162,13 @@ func main() {
 	// Start HTTP server
 	gin.SetMode(gin.ReleaseMode)
 	r := setupRouter()
-	log.Println("Server started. Now accepting connections...")
+	log.Println("Service productservice started. Now accepting connections...")
 	r.Run(":8082")
+}
+
+func mustMapEnv(envKey string) string {
+	if os.Getenv(envKey) == "" {
+		log.Panicf("Environment variable %v not set", envKey)
+	}
+	return os.Getenv(envKey)
 }

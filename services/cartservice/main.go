@@ -157,7 +157,7 @@ var rclient *redis.Client
 
 // init initializes our Redis database
 func init() {
-	redisHost := os.Getenv("REDIS_HOST")
+	redisHost := mustMapEnv("REDIS_HOST")
 	rclient = redis.NewClient(&redis.Options{
 		Addr:     redisHost,
 		Password: "", // no password set
@@ -175,7 +175,7 @@ func init() {
 			if err != nil {
 				log.Printf("Could not connect to Redis on host '%v', trying %v more time(s)", redisHost, counter)
 				counter--
-
+				time.Sleep(time.Second * 1)
 				if counter == 0 {
 					log.Panicf("Could not connect to Redis on host '%v'.", redisHost)
 					break
@@ -193,6 +193,13 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	gin.DisableConsoleColor()
 	r := setupRouter()
-	log.Println("Server started. Now accepting connections...")
+	log.Println("Service cartservice started. Now accepting connections...")
 	r.Run(":8081")
+}
+
+func mustMapEnv(envKey string) string {
+	if os.Getenv(envKey) == "" {
+		log.Panicf("Environment variable %v not set", envKey)
+	}
+	return os.Getenv(envKey)
 }

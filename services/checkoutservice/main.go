@@ -6,20 +6,20 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
-	cartservice     = os.Getenv("CARTSERVICE")
-	emailservice    = os.Getenv("EMAILSERVICE")
-	paymentservice  = os.Getenv("PAYMENTSERVICE")
-	shippingservice = os.Getenv("SHIPPINGSERVICE")
-	productservice  = os.Getenv("PRODUCTSERVICE")
+	cartservice     = mustMapEnv("CARTSERVICE")
+	emailservice    = mustMapEnv("EMAILSERVICE")
+	paymentservice  = mustMapEnv("PAYMENTSERVICE")
+	shippingservice = mustMapEnv("SHIPPINGSERVICE")
+	productservice  = mustMapEnv("PRODUCTSERVICE")
 )
 
 // Checkout represents the information required to perform a succesful checkout.
@@ -279,10 +279,22 @@ func setupRouter() *gin.Engine {
 	return router
 }
 
+func init() {
+	log.SetFormatter(&log.JSONFormatter{})
+	log.SetOutput(os.Stdout)
+}
+
 func main() {
 	// Start HTTP server
 	gin.SetMode(gin.ReleaseMode)
 	r := setupRouter()
-	log.Println("Server started. Now accepting connections...")
+	log.Println("Service checkoutservice started. Now accepting connections...")
 	r.Run(":8080")
+}
+
+func mustMapEnv(envKey string) string {
+	if os.Getenv(envKey) == "" {
+		log.Panicf("Environment variable %v not set", envKey)
+	}
+	return os.Getenv(envKey)
 }

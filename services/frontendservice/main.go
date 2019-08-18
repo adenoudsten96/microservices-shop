@@ -423,7 +423,7 @@ func main() {
 	r.HandleFunc("/cart", cartPage).Methods(http.MethodGet, http.MethodPost)
 	r.HandleFunc("/cart/empty", emptyCart).Methods(http.MethodGet)
 	r.HandleFunc("/checkout", checkoutPage).Methods(http.MethodGet, http.MethodPost)
-	r.HandleFunc("/healthcheck", checkoutPage).Methods(http.MethodGet)
+	r.HandleFunc("/health", checkoutPage).Methods(http.MethodGet)
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	log.Info("Starting service frontend")
 
