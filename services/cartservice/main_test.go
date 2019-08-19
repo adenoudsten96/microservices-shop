@@ -4,14 +4,12 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestHealthCheck(t *testing.T) {
-	os.Setenv("REDIS_HOST", "localhost:32768")
 	router := setupRouter()
 	w := httptest.NewRecorder()
 

@@ -7,6 +7,9 @@ jobs:
     docker:
       # specify the version
       - image: circleci/golang:1.12
+        environment:
+          REDIS_HOST: localhost:6379
+      - image: circleci/redis:latest
 
       # Specify service dependencies here if necessary
       # CircleCI maintains a library of pre-built images
