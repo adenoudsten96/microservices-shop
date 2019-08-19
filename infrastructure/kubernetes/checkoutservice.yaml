@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkoutservice
+spec:
+  selector:
+    app: checkoutservice
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+      nodePort: 30001
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkoutservice-deployment
+  labels:
+    app: checkoutservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: checkoutservice
+  template:
+    metadata:
+      labels:
+        app: checkoutservice
+    spec:
+      containers:
+      - name: checkoutservice
+        image: adenoudsten96/checkoutservice
+        ports:
+        - containerPort: 8080
+        env:
+          - name: CARTSERVICE
+            value: "http://cartservice:8081"
+          - name: EMAILSERVICE
+            value: "http://emailservice:8002"
+          - name: PAYMENTSERVICE
+            value: "http://paymentservice:8000"
+          - name: SHIPPINGSERVICE
+            value: "http://shippingservice:8001"
+          - name: PRODUCTSERVICE
+            value: "http://productservice:8082"
+        imagePullPolicy: Always

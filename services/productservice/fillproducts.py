@@ -1,7 +1,7 @@
 import requests
 import json
 
-url = "http://localhost:8082/product"
+url = "http://localhost:30002/product"
 
 products = [{
     "SKU": "SKU1",

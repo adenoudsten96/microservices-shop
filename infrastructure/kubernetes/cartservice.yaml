@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cartservice
+spec:
+  selector:
+    app: cartservice
+  ports:
+    - protocol: TCP
+      port: 8081
+      targetPort: 8081
+      nodePort: 30000
+  type: NodePort
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cartservice-redis
+spec:
+  selector:
+    app: cartservice-redis
+  ports:
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cartservice-deployment
+  labels:
+    app: cartservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cartservice
+  template:
+    metadata:
+      labels:
+        app: cartservice
+    spec:
+      containers:
+      - name: cartservice
+        image: adenoudsten96/cartservice
+        ports:
+        - containerPort: 8081
+        env:
+          - name: REDIS_HOST
+            value: "cartservice-redis:6379"
+        imagePullPolicy: Always
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cartservice-redis
+  labels:
+    app: cartservice-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cartservice-redis
+  template:
+    metadata:
+      labels:
+        app: cartservice-redis
+    spec:
+      containers:
+      - name: redis
+        image: redis
+        ports:
+        - containerPort: 6379
+        imagePullPolicy: IfNotPresent

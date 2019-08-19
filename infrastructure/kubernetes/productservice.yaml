@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: productservice
+spec:
+  selector:
+    app: productservice
+  ports:
+    - protocol: TCP
+      port: 8082
+      targetPort: 8082
+      nodePort: 30002
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: productservice-deployment
+  labels:
+    app: productservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: productservice
+  template:
+    metadata:
+      labels:
+        app: productservice
+    spec:
+      containers:
+      - name: productservice
+        image: adenoudsten96/productservice
+        ports:
+        - containerPort: 8082
+        env:
+          - name: DB_HOST
+            value: "productservice-db"
+          - name: DB_PASS
+            value: ""
+        imagePullPolicy: IfNotPresent
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: productservice-db
+spec:
+  selector:
+    app: productservice-db
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: productservice-db
+  labels:
+    app: productservice-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: productservice-db
+  template:
+    metadata:
+      labels:
+        app: productservice-db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres
+        ports:
+        - containerPort: 5432
+        env:
+          - name: POSTGRES_DB
+            value: "products"
+        imagePullPolicy: Always

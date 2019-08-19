@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontendservice
+spec:
+  selector:
+    app: frontendservice
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+      nodePort: 30003
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontendservice-deployment
+  labels:
+    app: frontendservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontendservice
+  template:
+    metadata:
+      labels:
+        app: frontendservice
+    spec:
+      containers:
+      - name: frontendservice
+        image: adenoudsten96/frontendservice
+        ports:
+        - containerPort: 8080
+        env:
+          - name: CARTSERVICE
+            value: "http://cartservice:8081"
+          - name: PRODUCTSERVICE
+            value: "http://productservice:8082"
+          - name: CHECKOUTSERVICE
+            value: "http://checkoutservice:8080"
+        imagePullPolicy: Always

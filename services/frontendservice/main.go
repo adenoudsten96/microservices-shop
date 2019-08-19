@@ -20,9 +20,6 @@ import (
 var (
 	tpl             *template.Template
 	cartservice     = mustMapEnv("CARTSERVICE")
-	emailservice    = mustMapEnv("EMAILSERVICE")
-	paymentservice  = mustMapEnv("PAYMENTSERVICE")
-	shippingservice = mustMapEnv("SHIPPINGSERVICE")
 	productservice  = mustMapEnv("PRODUCTSERVICE")
 	checkoutservice = mustMapEnv("CHECKOUTSERVICE")
 )
@@ -198,7 +195,7 @@ func checkoutPage(w http.ResponseWriter, r *http.Request) {
 	sessionid := cookie.Value
 
 	// Prepare JSON payload
-	payload := map[string]interface{}{
+	payload := map[string]string{
 		"SessionID":  sessionid,
 		"Address":    address,
 		"Email":      email,
