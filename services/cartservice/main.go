@@ -117,7 +117,7 @@ func emptyCart(c *gin.Context) {
 	// Return cart emptied message
 	c.JSON(
 		http.StatusOK,
-		gin.H{"message": "ok"},
+		gin.H{"status": "ok"},
 	)
 }
 
