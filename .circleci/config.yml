@@ -25,10 +25,10 @@ jobs:
           PORT: "8001"
       - image: adenoudsten96/paymentservice:latest
         environment:
-            PORT: "8001"
+            PORT: "8000"
       - image: adenoudsten96/emailservice:latest
         environment:
-            PORT: "8001"
+            PORT: "8002"
       - image: adenoudsten96/checkoutservice:latest
         environment:
           CARTSERVICE: http://cartservice:8081
