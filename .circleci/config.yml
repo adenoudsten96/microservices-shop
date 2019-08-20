@@ -61,9 +61,9 @@ jobs:
           paths:
             - "/go/pkg"
           key: v1-pkg-cache
-      # - run: 
-      #     name: Build Docker images
-      #     command: cd services; for d in */ ; do cd $d && dir=$(echo $d | tr -d '/') && docker build -t adenoudsten96/$dir:$CIRCLE_BUILD_NUM . && cd .. ; done
+      - run: 
+          name: Build Docker images
+          command: cd services; for d in */ ; do cd $d && dir=$(echo $d | tr -d '/') && docker build -t adenoudsten96/$dir:$CIRCLE_BUILD_NUM . && cd .. ; done
       - run:
           name: Log in to Docker
           command: echo "$DOCKERHUB_PASS" | docker login -u "adenoudsten96" --password-stdin
