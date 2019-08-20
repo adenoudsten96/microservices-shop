@@ -9,7 +9,35 @@ jobs:
       - image: circleci/golang:1.12
         environment:
           REDIS_HOST: localhost:6379
+          DB_HOST: localhost:5432
+          DB_PASS: Appelflap1
+          CARTSERVICE: http://cartservice:8081
+          EMAILSERVICE: http://emailservice:8002
+          PAYMENTSERVICE: http://paymentservice:8000
+          SHIPPINGSERVICE: http://shippingservice:8001
+          PRODUCTSERVICE: http://productservice:8082
       - image: circleci/redis:latest
+      - image: circleci/postgres:latest
+        environment:
+          POSTGRES_DB: products
+      - image: adenoudsten96/shippingservice:latest
+        environment:
+          PORT: "8001"
+      - image: adenoudsten96/paymentservice:latest
+        environment:
+            PORT: "8001"
+      - image: adenoudsten96/emailservice:latest
+        environment:
+            PORT: "8001"
+      - image: adenoudsten96/checkoutservice:latest
+        environment:
+          CARTSERVICE: http://cartservice:8081
+          EMAILSERVICE: http://emailservice:8002
+          PAYMENTSERVICE: http://paymentservice:8000
+          SHIPPINGSERVICE: http://shippingservice:8001
+          PRODUCTSERVICE: http://productservice:8082
+      - image: adenoudsten96/productservice:latest
+      - image: adenoudsten96/cartservice:latest
 
       # Specify service dependencies here if necessary
       # CircleCI maintains a library of pre-built images
