@@ -37,7 +37,12 @@ jobs:
           SHIPPINGSERVICE: http://shippingservice:8001
           PRODUCTSERVICE: http://productservice:8082
       - image: adenoudsten96/productservice:latest
+        environment:
+          DB_HOST: localhost:5432
+          DB_PASS: Appelflap1
       - image: adenoudsten96/cartservice:latest
+        environment:
+          REDIS_HOST: localhost:6379
 
       # Specify service dependencies here if necessary
       # CircleCI maintains a library of pre-built images
