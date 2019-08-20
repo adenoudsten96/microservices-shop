@@ -69,7 +69,7 @@ jobs:
           command: echo "$DOCKERHUB_PASS" | docker login -u "adenoudsten96" --password-stdin
       - run:
           name: Push all new Docker images to Dockerhub
-          command: cd /go/src/github.com/adenoudsten96/microservices-shop/services; for d in */ ; do cd $d && dir=$(echo $d | tr -d '/') && docker push adenoudsten96/$dir:$CIRCLE_BUILD_NUM . && cd .. ; done
+          command: cd /go/src/github.com/adenoudsten96/microservices-shop/services; for d in */ ; do cd $d && dir=$(echo $d | tr -d '/') && docker push adenoudsten96/$dir:$CIRCLE_BUILD_NUM && cd .. ; done
 
 workflows:
   version: 2
