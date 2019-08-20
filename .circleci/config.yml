@@ -9,13 +9,13 @@ jobs:
       - image: circleci/golang:1.12
         environment:
           REDIS_HOST: localhost:6379
-          DB_HOST: localhost:5432
+          DB_HOST: localhost
           DB_PASS: Appelflap1
-          CARTSERVICE: http://cartservice:8081
-          EMAILSERVICE: http://emailservice:8002
-          PAYMENTSERVICE: http://paymentservice:8000
-          SHIPPINGSERVICE: http://shippingservice:8001
-          PRODUCTSERVICE: http://productservice:8082
+          CARTSERVICE: http://localhost:8081
+          EMAILSERVICE: http://localhost:8002
+          PAYMENTSERVICE: http://localhost:8000
+          SHIPPINGSERVICE: http://localhost:8001
+          PRODUCTSERVICE: http://localhost:8082
       - image: circleci/redis:latest
       - image: circleci/postgres:latest
         environment:
@@ -31,11 +31,11 @@ jobs:
             PORT: "8002"
       - image: adenoudsten96/checkoutservice:latest
         environment:
-          CARTSERVICE: http://cartservice:8081
-          EMAILSERVICE: http://emailservice:8002
-          PAYMENTSERVICE: http://paymentservice:8000
-          SHIPPINGSERVICE: http://shippingservice:8001
-          PRODUCTSERVICE: http://productservice:8082
+          CARTSERVICE: http://localhost:8081
+          EMAILSERVICE: http://localhost:8002
+          PAYMENTSERVICE: http://localhost:8000
+          SHIPPINGSERVICE: http://localhost:8001
+          PRODUCTSERVICE: http://localhost:8082
       - image: adenoudsten96/productservice:latest
         environment:
           DB_HOST: localhost:5432
