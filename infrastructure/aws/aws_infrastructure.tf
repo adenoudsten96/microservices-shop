@@ -146,6 +146,25 @@ resource "aws_security_group" "kube_master" {
   }
 }
 
+resource "aws_security_group_rule" "master_to_node" {
+  type = "ingress"
+  from_port = 0
+  to_port = 0
+  protocol = "-1"
+  source_security_group_id = aws_security_group.kube_node.id
+  security_group_id = aws_security_group.kube_master.id
+}
+
+resource "aws_security_group_rule" "node_to_master" {
+  type = "ingress"
+  from_port = 0
+  to_port = 0
+  protocol = "-1"
+  source_security_group_id = aws_security_group.kube_master.id
+  security_group_id = aws_security_group.kube_node.id
+}
+
+
 resource "aws_instance" "kube-master" {
   ami = "ami-07d0cf3af28718ef8"
   instance_type = "t2.medium"
