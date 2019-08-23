@@ -1,0 +1,159 @@
+---
+- hosts: local
+  connection: local
+  vars_files: aws_keys.yml
+  gather_facts: False
+
+  vars:
+    region: us-east-1
+
+  tasks:
+  - name: Get AWS instance info
+    ec2_instance_facts:
+      aws_access_key: "{{ aws_access_key }}"
+      aws_secret_key: "{{ aws_secret_key }}"
+      security_token: "{{ security_token }}"
+      region: "{{region}}"
+      filters:
+        instance-state-name: "running"
+    register: ec2_metadata
+
+  - name: Add kube-master to hosts
+    add_host:
+      name: "{{item}}"
+      groups: kube-masters
+    with_items: "{{ec2_metadata.instances[0].public_ip_address}}"
+
+  - name: Add kube-node to hosts
+    add_host:
+      name: "{{item}}"
+      groups: kube-nodes
+    with_items: "{{ec2_metadata.instances[1].public_ip_address}}"
+
+  # - debug:
+  #     msg: "{{item}}"
+  #   with_items:  "{{ ec2_metadata.instances }}"
+
+- hosts: kube-masters
+  remote_user: ubuntu
+  become: true
+  gather_facts: False
+
+  tasks:
+  - name: Install apt packages
+    apt:
+      name: "{{packages}}"
+      update_cache: yes
+    vars:
+      packages:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - gnupg-agent
+        - software-properties-common
+  - name: Add Docker repo key
+    apt_key:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      state: present
+  - name: Add Docker repo
+    shell: add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+  - name: Install Docker
+    apt:
+      name: "{{packages}}"
+      update_cache: yes
+    vars:
+      packages:
+        - docker-ce
+        - docker-ce-cli
+        - containerd.io
+  - name: Disable firewall
+    ufw:
+      state: disabled
+  - name: Get Google apt key
+    apt_key:
+      url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+      state: present
+  - name: Add Google apt repo
+    apt_repository:
+      repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+      state: present
+  - name: Install kube packages
+    apt:
+      name: "{{packages}}"
+      update_cache: yes
+    vars:
+      packages:
+        - kubelet
+        - kubeadm
+        - kubectl
+  - name: Init Kubernetes cluster
+    shell: kubeadm init --pod-network-cidr=192.168.0.0/16 --apiserver-cert-extra-sans "{{inventory_hostname}}"
+    register: kubeadm_output
+  - debug:
+      msg: "{{kubeadm_output.stdout_lines[-2:]}}"
+  - name: Create .kube dir
+    file: 
+      path: /home/ubuntu/.kube
+      state: directory
+  - name: Copy kubeconfig file
+    fetch:
+      src: /etc/kubernetes/admin.conf
+      dest: /home/alex/.kube/config
+      flat: yes
+  - name: Replace IP address
+    local_action: command sed -i 's/[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}/{{inventory_hostname}}/g' /home/alex/.kube/config
+    become: false
+- hosts: kube-nodes
+  remote_user: ubuntu
+  become: true
+  gather_facts: False
+
+  tasks:
+    - name: Install apt packages
+      apt:
+        name: "{{packages}}"
+        update_cache: yes
+      vars:
+        packages:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg-agent
+          - software-properties-common
+    - name: Add Docker repo key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+    - name: Add Docker repo
+      shell: add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+    - name: Install Docker
+      apt:
+        name: "{{packages}}"
+        update_cache: yes
+      vars:
+        packages:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+    - name: Disable firewall
+      ufw:
+        state: disabled
+    - name: Get Google apt key
+      apt_key:
+        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+        state: present
+    - name: Add Google apt repo
+      apt_repository:
+        repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+        state: present
+    - name: Install kube packages
+      apt:
+        name: "{{packages}}"
+        update_cache: yes
+      vars:
+        packages:
+          - kubelet
+          - kubeadm
+          - kubectl
+    - name: join cluster
+      shell: "{{hostvars[groups['kube-masters'][0]]['kubeadm_output']['stdout_lines'][-2:][0][:-2]}} {{hostvars[groups['kube-masters'][0]]['kubeadm_output']['stdout_lines'][-2:][1][4:]}}"

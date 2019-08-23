@@ -1,1 +1,4 @@
 *.exe
+*.tfstate
+*.terraform
+*.tfstate.backup
