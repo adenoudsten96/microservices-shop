@@ -8,10 +8,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
+	ginlogrus "github.com/toorop/gin-logrus"
 )
 
 var (
@@ -51,11 +52,13 @@ type Ship struct {
 func getShoppingCart(sessionid string) (Cart, error) {
 
 	// Make the request to the cart service
-	log.Println("Calling service cartservice...")
 	url := fmt.Sprintf("%v/cart/%v", cartservice, sessionid)
 	resp, err := http.Get(url)
 	if err != nil {
-		log.Println(err)
+		log.WithFields(log.Fields{
+			"url": url,
+		}).Error(err)
+		return Cart{}, err
 	}
 	defer resp.Body.Close()
 
@@ -67,14 +70,14 @@ func getShoppingCart(sessionid string) (Cart, error) {
 	// Read HTTP body
 	result, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 	}
 
 	// Unmarshal the JSON into our Cart struct
 	var cart Cart
 	err = json.Unmarshal(result, &cart)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 	}
 
 	// Return the shopping cart
@@ -90,7 +93,10 @@ func payProduct(creditcard string, amount int) (string, error) {
 	payload := []byte(fmt.Sprintf(`{"creditcard": "%v", "amount": %v}`, creditcard, amount))
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(payload))
 	if err != nil {
-		log.Println(err)
+		log.WithFields(log.Fields{
+			"url": url,
+		}).Error(err)
+		return "", err
 	}
 	defer resp.Body.Close()
 
@@ -102,7 +108,7 @@ func payProduct(creditcard string, amount int) (string, error) {
 	// Read HTTP body
 	result, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 	}
 
 	// Unmarshal results
@@ -130,7 +136,10 @@ func shipProduct(address string, products []Item) (string, error) {
 	payload, _ := json.Marshal(ship)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(payload))
 	if err != nil {
-		log.Println(err)
+		log.WithFields(log.Fields{
+			"url": url,
+		}).Error(err)
+		return "", err
 	}
 	defer resp.Body.Close()
 
@@ -142,7 +151,7 @@ func shipProduct(address string, products []Item) (string, error) {
 	// Read HTTP body
 	result, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 	}
 
 	// Unmarshal results
@@ -164,7 +173,10 @@ func sendEmail(email string) error {
 	payload := []byte(fmt.Sprintf(`{"email": "%v"}`, email))
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(payload))
 	if err != nil {
-		log.Println(err)
+		log.WithFields(log.Fields{
+			"url": url,
+		}).Error(err)
+		return err
 	}
 	defer resp.Body.Close()
 
@@ -182,7 +194,7 @@ func checkout(c *gin.Context) {
 	// Get the JSON data
 	var checkout Checkout
 	if err := c.ShouldBindJSON(&checkout); err != nil {
-		log.Println(err)
+		log.Error(err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
 		})
@@ -192,7 +204,8 @@ func checkout(c *gin.Context) {
 	// Get the users shopping cart
 	cart, err := getShoppingCart(checkout.SessionID)
 	if err != nil {
-		fmt.Println(err)
+		log.Error(err)
+		return
 	}
 
 	// Count up the price and charge the users creditcard
@@ -205,14 +218,18 @@ func checkout(c *gin.Context) {
 		url := fmt.Sprintf("%v/product/%v", productservice, v.Sku)
 		resp, err := http.Get(url)
 		if err != nil {
-			log.Println(err)
+			log.WithFields(log.Fields{
+				"url": url,
+			}).Error(err)
+			return
 		}
 		defer resp.Body.Close()
 
 		// Read HTTP body
 		result, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
+			return
 		}
 
 		// Unmarshal JSON into struct
@@ -229,23 +246,29 @@ func checkout(c *gin.Context) {
 	// Charge the user by calling the Payments service
 	transactionid, err := payProduct(checkout.Creditcard, total)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
+		return
 	}
 
 	// Ship the products to the user
 	shippingid, err := shipProduct(checkout.Address, cart.Items)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
+		return
 	}
 
 	// Send the user an email
 	err = sendEmail(checkout.Email)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
+		return
 	}
 
 	// Return checkout success and ID's
-	log.Printf("Succesfully checked out user with sessionid %v for a total of €%v", checkout.SessionID, total/100)
+	log.WithFields(log.Fields{
+		"sessionid": checkout.SessionID,
+		"total":     total / 100,
+	}).Info("Checked out user")
 	c.JSON(
 		http.StatusOK,
 		gin.H{
@@ -255,27 +278,20 @@ func checkout(c *gin.Context) {
 	)
 }
 
+func healthCheck(c *gin.Context) {
+	c.String(200, "OK")
+}
+
 // setupRouter initializes our HTTP routes
 func setupRouter() *gin.Engine {
 	router := gin.New()
+	logger := logrus.New()
+	logger.SetFormatter(&log.JSONFormatter{})
+	logger.SetOutput(os.Stdout)
+	router.Use(ginlogrus.Logger(logger), gin.Recovery())
 
-	router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-
-		// Custom log format
-		return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\"\n",
-			param.ClientIP,
-			param.TimeStamp.Format(time.RFC1123),
-			param.Method,
-			param.Path,
-			param.Request.Proto,
-			param.StatusCode,
-			param.Latency,
-			param.Request.UserAgent(),
-			param.ErrorMessage,
-		)
-	}))
-	router.Use(gin.Recovery())
 	router.POST("/checkout", checkout)
+	router.GET("/health", healthCheck)
 	return router
 }
 

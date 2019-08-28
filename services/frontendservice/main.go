@@ -56,7 +56,7 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		uuid, err := uuid.NewV4()
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 		}
 		cookie := http.Cookie{Name: "sessionid", Value: uuid.String(), Expires: time.Now().Add(1 * time.Hour)}
 		http.SetCookie(w, &cookie)
@@ -66,13 +66,14 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 	products, status, err := getProducts()
 	// Render error page if something went wrong
 	if status != 200 {
+		log.Error(err)
 		renderError(w, r, status, err)
 		return
 	}
 
 	err = tpl.ExecuteTemplate(w, "home.html", products)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 	}
 }
 
@@ -82,6 +83,7 @@ func productPage(w http.ResponseWriter, r *http.Request) {
 
 	// Render error page if something went wrong
 	if status != 200 {
+		log.Error(err)
 		renderError(w, r, status, err)
 		return
 	}
@@ -93,7 +95,7 @@ func productPage(w http.ResponseWriter, r *http.Request) {
 		if v.SKU == sku {
 			err := tpl.ExecuteTemplate(w, "product.html", v)
 			if err != nil {
-				fmt.Println(err)
+				log.Error(err)
 				return
 			}
 			return
@@ -112,7 +114,7 @@ func cartPage(w http.ResponseWriter, r *http.Request) {
 		qtystr := r.PostFormValue("qty")
 		cookie, err := r.Cookie("sessionid")
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 		}
 		sessionid := cookie.Value
 		qty, _ := strconv.Atoi(qtystr)
@@ -122,6 +124,7 @@ func cartPage(w http.ResponseWriter, r *http.Request) {
 
 		// Render the error page if something went wrong
 		if status != 201 {
+			log.Error(err)
 			renderError(w, r, status, err)
 			return
 		}
@@ -130,13 +133,14 @@ func cartPage(w http.ResponseWriter, r *http.Request) {
 	// Get the users shopping cart
 	ck, err := r.Cookie("sessionid")
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		renderError(w, r, 0, err)
 	}
 	sessionid := ck.Value
 	cart, status, err := getCart(sessionid)
 
 	if err != nil {
+		log.Error(err)
 		renderError(w, r, status, err)
 		return
 	}
@@ -157,6 +161,7 @@ func cartPage(w http.ResponseWriter, r *http.Request) {
 	products, status, err := getProducts()
 	// Render error page if something went wrong
 	if status != 200 {
+		log.Error(err)
 		renderError(w, r, status, err)
 		return
 	}
@@ -180,7 +185,7 @@ func cartPage(w http.ResponseWriter, r *http.Request) {
 		"items": irs,
 		"total": total})
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 	}
 }
 
@@ -205,17 +210,17 @@ func checkoutPage(w http.ResponseWriter, r *http.Request) {
 
 	// Check the user out by calling the checkoutservice
 	url := fmt.Sprintf("%v/checkout", checkoutservice)
-	log.Println("Calling service checkoutservice...")
+	log.Info("Calling service checkoutservice...")
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonPayload))
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 	}
 	defer resp.Body.Close()
 
 	// Read HTTP body
 	result, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 	}
 
 	// Unmarshal response
@@ -228,6 +233,7 @@ func checkoutPage(w http.ResponseWriter, r *http.Request) {
 
 	// Render error page if something went wrong
 	if resp.StatusCode != 200 {
+		log.Error(err)
 		renderError(w, r, resp.StatusCode, errors.New(string(result)))
 		return
 	}
@@ -235,6 +241,7 @@ func checkoutPage(w http.ResponseWriter, r *http.Request) {
 	// Empty the shopping cart and render the page if the checkout was succesful
 	status, err := deleteCart(sessionid)
 	if err != nil {
+		log.Error(err)
 		renderError(w, r, status, err)
 		return
 	}
@@ -244,14 +251,14 @@ func checkoutPage(w http.ResponseWriter, r *http.Request) {
 		"total":    total,
 	})
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 	}
 }
 
 func emptyCart(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("sessionid")
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		renderError(w, r, 0, err)
 		return
 	}
@@ -259,7 +266,7 @@ func emptyCart(w http.ResponseWriter, r *http.Request) {
 
 	status, err := deleteCart(sessionid)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		renderError(w, r, status, err)
 		return
 	}
@@ -272,10 +279,10 @@ func getProducts() ([]ProductResponse, int, error) {
 	// Get all products
 	url := fmt.Sprintf("%v/product", productservice)
 
-	log.Println("Calling service productservice...")
+	log.Info("Calling service productservice...")
 	resp, err := http.Get(url)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return []ProductResponse{}, 0, err
 	}
 	defer resp.Body.Close()
@@ -283,7 +290,7 @@ func getProducts() ([]ProductResponse, int, error) {
 	// Read HTTP body
 	result, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return []ProductResponse{}, 0, err
 	}
 
@@ -295,7 +302,7 @@ func getProducts() ([]ProductResponse, int, error) {
 	err = json.Unmarshal(result, &products)
 
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return []ProductResponse{}, 0, err
 	}
 
@@ -305,14 +312,14 @@ func getProducts() ([]ProductResponse, int, error) {
 func addToCart(sessionid, sku string, qty int) (int, error) {
 	// Add the items to our cart by calling the cartservice
 	url := fmt.Sprintf("%v/cart/%v", cartservice, sessionid)
-	log.Println("Calling service cartservice...")
+	log.Info("Calling service cartservice...")
 	cart := Cart{
 		Items: []Item{Item{Sku: sku, Qty: qty}},
 	}
 	jsonValue, err := json.Marshal(cart)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonValue))
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return 0, err
 	}
 	defer resp.Body.Close()
@@ -320,7 +327,7 @@ func addToCart(sessionid, sku string, qty int) (int, error) {
 	// Read HTTP body
 	result, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return 0, err
 	}
 
@@ -334,10 +341,10 @@ func addToCart(sessionid, sku string, qty int) (int, error) {
 func getCart(sessionid string) (Cart, int, error) {
 	url := fmt.Sprintf("%v/cart/%v", cartservice, sessionid)
 
-	log.Println("Calling service cartservice...")
+	log.Info("Calling service cartservice...")
 	resp, err := http.Get(url)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return Cart{}, 0, err
 	}
 	defer resp.Body.Close()
@@ -345,11 +352,12 @@ func getCart(sessionid string) (Cart, int, error) {
 	// Read HTTP body
 	result, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return Cart{}, 0, err
 	}
 
 	if resp.StatusCode != 200 {
+		log.Error(err)
 		return Cart{}, resp.StatusCode, errors.New(string(result))
 	}
 
@@ -366,14 +374,14 @@ func deleteCart(sessionid string) (int, error) {
 	client := &http.Client{}
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
-		fmt.Println(err)
+		log.Error(err)
 		return 0, err
 	}
 
 	// Fetch Request
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		log.Error(err)
 		return 0, err
 	}
 	defer resp.Body.Close()
@@ -381,7 +389,7 @@ func deleteCart(sessionid string) (int, error) {
 	// Read Response Body
 	result, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println(err)
+		log.Error(err)
 		return 0, err
 	}
 

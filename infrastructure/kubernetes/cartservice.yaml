@@ -50,6 +50,12 @@ spec:
           - name: REDIS_HOST
             value: "cartservice-redis:6379"
         imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 10
 ---
 apiVersion: apps/v1
 kind: Deployment

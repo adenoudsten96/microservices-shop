@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -10,6 +8,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis"
+	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
+	ginlogrus "github.com/toorop/gin-logrus"
 )
 
 // Cart represents the shopping cart model
@@ -37,7 +38,7 @@ func addToCart(c *gin.Context) {
 	// Unmarshal the JSON data from the body
 	var cart Cart
 	if err := c.ShouldBindJSON(&cart); err != nil {
-		log.Println(err)
+		log.Error(err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
 		})
@@ -48,7 +49,10 @@ func addToCart(c *gin.Context) {
 	for _, i := range cart.Items {
 		err := rclient.HSet(sessionid, i.Sku, i.Qty).Err()
 		if err != nil {
-			log.Println(err)
+			log.WithFields(log.Fields{
+				"item":      i,
+				"sessionid": sessionid,
+			}).Error(err)
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": err.Error(),
 			})
@@ -57,6 +61,10 @@ func addToCart(c *gin.Context) {
 	}
 
 	// Return status created
+	log.WithFields(log.Fields{
+		"cart":      cart,
+		"sessionid": sessionid,
+	}).Info("Added item(s) to cart")
 	c.JSON(
 		http.StatusCreated,
 		gin.H{
@@ -74,7 +82,9 @@ func getCart(c *gin.Context) {
 	// Get all items in the shopping cart by session ID
 	result, err := rclient.HGetAll(sessionid).Result()
 	if err != nil {
-		log.Println(err)
+		log.WithFields(log.Fields{
+			"sessionid": sessionid,
+		}).Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
 		})
@@ -107,7 +117,9 @@ func emptyCart(c *gin.Context) {
 
 	// Delete the cart in Redis
 	if err := rclient.Del(sessionid).Err(); err != nil {
-		log.Println(err)
+		log.WithFields(log.Fields{
+			"sessionid": sessionid,
+		}).Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
 		})
@@ -115,6 +127,9 @@ func emptyCart(c *gin.Context) {
 	}
 
 	// Return cart emptied message
+	log.WithFields(log.Fields{
+		"sessionid": sessionid,
+	}).Info("Deleted item(s) from cart")
 	c.JSON(
 		http.StatusOK,
 		gin.H{"status": "ok"},
@@ -125,22 +140,25 @@ func emptyCart(c *gin.Context) {
 func setupRouter() *gin.Engine {
 	router := gin.New()
 
-	router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
+	// router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
 
-		// Custom log format
-		return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\"\n",
-			param.ClientIP,
-			param.TimeStamp.Format(time.RFC1123),
-			param.Method,
-			param.Path,
-			param.Request.Proto,
-			param.StatusCode,
-			param.Latency,
-			param.Request.UserAgent(),
-			param.ErrorMessage,
-		)
-	}))
-	router.Use(gin.Recovery())
+	// 	// Custom log format
+	// 	return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\"\n",
+	// 		param.ClientIP,
+	// 		param.TimeStamp.Format(time.RFC1123),
+	// 		param.Method,
+	// 		param.Path,
+	// 		param.Request.Proto,
+	// 		param.StatusCode,
+	// 		param.Latency,
+	// 		param.Request.UserAgent(),
+	// 		param.ErrorMessage,
+	// 	)
+	// }))
+	logger := logrus.New()
+	logger.SetFormatter(&log.JSONFormatter{})
+	logger.SetOutput(os.Stdout)
+	router.Use(ginlogrus.Logger(logger), gin.Recovery())
 
 	router.GET("/cart/:sessionid", getCart)
 	router.POST("/cart/:sessionid", addToCart)
@@ -157,6 +175,8 @@ var rclient *redis.Client
 
 // init initializes our Redis database
 func init() {
+	log.SetFormatter(&log.JSONFormatter{})
+	log.SetOutput(os.Stdout)
 	redisHost := mustMapEnv("REDIS_HOST")
 	rclient = redis.NewClient(&redis.Options{
 		Addr:     redisHost,
@@ -193,13 +213,15 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	gin.DisableConsoleColor()
 	r := setupRouter()
-	log.Println("Service cartservice started. Now accepting connections...")
+	log.Info("Service cartservice started. Now accepting connections...")
 	r.Run(":8081")
 }
 
 func mustMapEnv(envKey string) string {
 	if os.Getenv(envKey) == "" {
-		log.Panicf("Environment variable %v not set", envKey)
+		log.WithFields(log.Fields{
+			"envkey": envKey,
+		}).Panic("Could not bind environment variable")
 	}
 	return os.Getenv(envKey)
 }

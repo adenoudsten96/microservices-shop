@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"time"
@@ -10,6 +9,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
+	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
+	ginlogrus "github.com/toorop/gin-logrus"
 )
 
 // Product represents the product model
@@ -25,6 +27,7 @@ type Product struct {
 func getAllProducts(c *gin.Context) {
 	var allProducts []Product
 	if err := db.Find(&allProducts).Error; err != nil {
+		log.Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
 		})
@@ -42,7 +45,6 @@ func getProduct(c *gin.Context) {
 	// Check if there is a product with this SKU in the database
 	var product Product
 	if result := db.Where("sku = ?", sku).First(&product).RowsAffected; result == 0 {
-		log.Println(sku)
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "not found",
 		})
@@ -59,7 +61,7 @@ func createProduct(c *gin.Context) {
 	// Get the JSON data
 	var product Product
 	if err := c.ShouldBindJSON(&product); err != nil {
-		log.Println(err)
+		log.Error(err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
 		})
@@ -76,7 +78,7 @@ func createProduct(c *gin.Context) {
 
 	// Insert the product into the database
 	if err := db.Create(&product).Error; err != nil {
-		log.Println(err)
+		log.Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
 		})
@@ -94,6 +96,8 @@ var db *gorm.DB
 
 // init initializes our Postgres database
 func init() {
+	log.SetFormatter(&log.JSONFormatter{})
+	log.SetOutput(os.Stdout)
 	// Setup the database connection
 	var err error
 	username := "postgres"
@@ -132,29 +136,21 @@ func init() {
 
 }
 
+func healthCheck(c *gin.Context) {
+	c.String(200, "OK")
+}
+
 // setupRouter initializes our HTTP routes
 func setupRouter() *gin.Engine {
 	router := gin.New()
-
-	router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-
-		// Custom log format
-		return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\"\n",
-			param.ClientIP,
-			param.TimeStamp.Format(time.RFC1123),
-			param.Method,
-			param.Path,
-			param.Request.Proto,
-			param.StatusCode,
-			param.Latency,
-			param.Request.UserAgent(),
-			param.ErrorMessage,
-		)
-	}))
-	router.Use(gin.Recovery())
+	logger := logrus.New()
+	logger.SetFormatter(&log.JSONFormatter{})
+	logger.SetOutput(os.Stdout)
+	router.Use(ginlogrus.Logger(logger), gin.Recovery())
 	router.GET("/product", getAllProducts)
 	router.GET("/product/:sku", getProduct)
 	router.POST("/product", createProduct)
+	router.GET("/health", healthCheck)
 	return router
 }
 
