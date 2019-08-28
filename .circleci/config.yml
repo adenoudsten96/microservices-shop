@@ -39,7 +39,7 @@ jobs:
       - image: adenoudsten96/productservice:latest
         environment:
           DB_HOST: localhost:5432
-          DB_PASS: Appelflap1
+          DB_PASS: $DB_PASS
       - image: adenoudsten96/cartservice:latest
         environment:
           REDIS_HOST: localhost:6379
@@ -69,7 +69,7 @@ jobs:
           command: echo "$DOCKERHUB_PASS" | docker login -u "adenoudsten96" --password-stdin
       - run:
           name: Push all new Docker images to Dockerhub
-          command: cd /go/src/github.com/adenoudsten96/microservices-shop/services; for d in */ ; do cd $d && dir=$(echo $d | tr -d '/') && docker push adenoudsten96/$dir:$CIRCLE_BUILD_NUM && cd .. ; done
+          command: cd /go/src/github.com/adenoudsten96/microservices-shop/services; for d in */ ; do cd $d && dir=$(echo $d | tr -d '/') && docker push adenoudsten96/$dir:latest && cd .. ; done
 
 workflows:
   version: 2
