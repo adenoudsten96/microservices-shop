@@ -28,6 +28,7 @@ The application is microservices based and consists of the following services:
 - [Logrus](https://github.com/sirupsen/logrus) for structured logging
 - [Mux](https://github.com/gorilla/mux) for the frontend server
 - [Starlette](https://www.starlette.io/) as async Python webserver
+- [GORM](https://github.com/jinzhu/gorm) as database ORM
 - Redis as the cart store
 - PostgreSQL as the products database
 
