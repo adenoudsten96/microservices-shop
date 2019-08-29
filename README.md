@@ -1,6 +1,11 @@
 # Microservices-shop
 Microservice based shopping website written in Python and Go, deployed on Kubernetes in AWS. Personal project to learn Go, DevOps tech and CI/CD.
 
+- [Microservices-shop](#microservices-shop)
+  - [Backend](#backend)
+  - [Infrastructure](#infrastructure)
+  - [CI / CD](#ci--cd)
+
 ## Backend
 
 ![test](/img/Backend.png)
