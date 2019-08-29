@@ -32,7 +32,7 @@ spec:
       - name: frontendservice
         image: adenoudsten96/frontendservice
         ports:
-        - containerPort: 8080
+        - containerPort: 80
         env:
           - name: CARTSERVICE
             value: "http://cartservice:8081"
@@ -41,3 +41,4 @@ spec:
           - name: CHECKOUTSERVICE
             value: "http://checkoutservice:8080"
         imagePullPolicy: Always
+        

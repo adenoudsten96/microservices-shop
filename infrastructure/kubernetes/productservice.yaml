@@ -37,8 +37,9 @@ spec:
           - name: DB_HOST
             value: "productservice-db"
           - name: DB_PASS
-            value: ""
+            value: "Password"
         imagePullPolicy: IfNotPresent
+        
 ---
 apiVersion: v1
 kind: Service

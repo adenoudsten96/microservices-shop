@@ -45,3 +45,4 @@ spec:
           - name: PRODUCTSERVICE
             value: "http://productservice:8082"
         imagePullPolicy: Always
+        

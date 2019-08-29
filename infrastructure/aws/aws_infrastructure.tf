@@ -179,6 +179,7 @@ resource "aws_instance" "kube-master" {
 
 resource "aws_instance" "kube-node" {
   ami = "ami-07d0cf3af28718ef8"
+  count = 2
   instance_type = "t2.medium"
   key_name = "alex"
   vpc_security_group_ids = [aws_security_group.kube_node.id]

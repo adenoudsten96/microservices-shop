@@ -8,11 +8,16 @@
     region: us-east-1
 
   tasks:
+  - name: Apply Terraform
+    terraform:
+      project_path: "/home/alex/microservices-shop/infrastructure/aws"
+      state: present
+  
   - name: Get AWS instance info
     ec2_instance_facts:
-      aws_access_key: "{{ aws_access_key }}"
-      aws_secret_key: "{{ aws_secret_key }}"
-      security_token: "{{ security_token }}"
+      aws_access_key: "{{ aws_access_key_id }}"
+      aws_secret_key: "{{ aws_secret_access_key }}"
+      security_token: "{{ aws_session_token }}"
       region: "{{region}}"
       filters:
         instance-state-name: "running"
@@ -20,20 +25,17 @@
 
   - name: Add kube-master to hosts
     add_host:
-      name: "{{item}}"
+      name: "{{item.public_ip_address}}"
       groups: kube-masters
-    with_items: "{{ec2_metadata.instances[0].public_ip_address}}"
+    when: item.tags.name == "kube-master"
+    with_items: "{{ec2_metadata.instances}}"
 
-  - name: Add kube-node to hosts
+  - name: Add kube-nodes to hosts
     add_host:
-      name: "{{item}}"
+      name: "{{item.public_ip_address}}"
       groups: kube-nodes
-    with_items: "{{ec2_metadata.instances[1].public_ip_address}}"
-
-  # - debug:
-  #     msg: "{{item}}"
-  #   with_items:  "{{ ec2_metadata.instances }}"
-
+    when: item.tags.name == "kube-node"
+    with_items: "{{ec2_metadata.instances}}"
 - hosts: kube-masters
   remote_user: ubuntu
   become: true
@@ -157,3 +159,58 @@
           - kubectl
     - name: join cluster
       shell: "{{hostvars[groups['kube-masters'][0]]['kubeadm_output']['stdout_lines'][-2:][0][:-2]}} {{hostvars[groups['kube-masters'][0]]['kubeadm_output']['stdout_lines'][-2:][1][4:]}}"
+- hosts: local
+  connection: local
+  gather_facts: False
+
+  tasks:
+
+    - name: Allow scheduling of pods on master
+      shell: kubectl taint nodes --all node-role.kubernetes.io/master-
+      args:
+        chdir: /home/alex/microservices-shop/infrastructure/aws
+      ignore_errors: yes
+
+    - name: Apply Calico overlay network
+      shell: kubectl apply -f calico.yaml
+      args:
+        chdir: /home/alex/microservices-shop/infrastructure/aws
+    
+    - name: Label Istio namespace
+      shell: kubectl label namespace default istio-injection=enabled
+      args:
+        chdir: /home/alex/microservices-shop/infrastructure/aws
+      ignore_errors: yes
+
+    - name: Initialize Helm
+      shell: helm init
+
+    - pause: 
+        seconds: 5
+
+    - name: Create Tiller namespace and RBAC
+      shell: kubectl create serviceaccount --namespace kube-system tiller; kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller; kubectl patch deploy --namespace kube-system tiller-deploy -p '{"spec":{"template":{"spec":{"serviceAccount":"tiller"}}}}'
+      args:
+        chdir: /home/alex/microservices-shop/infrastructure/aws
+
+    - name: Initialize Istio
+      shell: helm install --name istio-init --namespace istio-system istio.io/istio-init
+      args:
+        chdir: /home/alex/microservices-shop/infrastructure/aws
+      ignore_errors: yes
+
+    - pause:
+        seconds: 15
+
+    - name: Install Istio
+      shell: helm install --name istio --namespace istio-system --set grafana.enabled=true istio.io/istio
+      args:
+        chdir: /home/alex/microservices-shop/infrastructure/aws
+    
+    - pause:
+        seconds: 30
+
+    - name: Deploy Microservices Shop Application
+      shell: kubectl apply -f kubernetes/
+      args:
+        chdir: /home/alex/microservices-shop/infrastructure
