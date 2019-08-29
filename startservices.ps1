@@ -10,7 +10,7 @@ Break
 # Set ENV variabales
 [System.Environment]::SetEnvironmentVariable("REDIS_HOST", "localhost:32768", [System.EnvironmentVariableTarget]::User)
 [System.Environment]::SetEnvironmentVariable("DB_HOST", "localhost", [System.EnvironmentVariableTarget]::User)
-[System.Environment]::SetEnvironmentVariable("DB_PASS", "Appelflap1", [System.EnvironmentVariableTarget]::User)
+[System.Environment]::SetEnvironmentVariable("DB_PASS", "", [System.EnvironmentVariableTarget]::User)
 
 # Services
 [System.Environment]::SetEnvironmentVariable("CHECKOUTSERVICE", "http://localhost:8080", [System.EnvironmentVariableTarget]::User)
